@@ -198,7 +198,28 @@ namespace Pharmacy
         }
 
         // Рівень Б: Безпечне читання цілого числа в межах [min; max]
-       
+        static int ReadInt(string prompt, int min, int max)
+        {
+            while (true)
+            {
+                Console.Write(prompt);
+                string input = Console.ReadLine() ?? "";
+
+                if (!int.TryParse(input, out int value))
+                {
+                    Console.WriteLine("Помилка: введено не ціле число. Спробуйте ще раз.");
+                    continue;
+                }
+
+                if (value < min || value > max)
+                {
+                    Console.WriteLine($"Помилка: число має бути в межах від {min} до {max}.");
+                    continue;
+                }
+
+                return value;
+            }
+        }
 
         // Пауза та очищення екрана
         static void Pause()
