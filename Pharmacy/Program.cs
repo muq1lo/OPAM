@@ -14,46 +14,43 @@ namespace Pharmacy
 
             while (running)
             {
-                Console.WriteLine("=== Аптека (Система обліку препаратів) ===");
-                Console.WriteLine("1 — довідка про систему та сутність");
-                Console.WriteLine("2 — розрахунок вартості замовлення (табулювання)");
-                Console.WriteLine("3 — звіт продажів по відділах (таблиця на два входи)");
-                Console.WriteLine("0 — вихід");
-                Console.Write("Ваш вибір: ");
-
+                ShowMenu();
                 string choice = Console.ReadLine() ?? "";
                 Console.WriteLine();
 
                 switch (choice)
                 {
-                    case "1":
-                        ShowAbout();
-                        Pause();
-                        break;
-                    case "2":
-                        ShowCostTable();
-                        Pause();
-                        break;
-                    case "3":
-                        ShowSalesTable();
-                        Pause();
-                        break;
-                    case "0":
-                        running = false;
-                        Console.WriteLine("Роботу завершено. До побачення!");
-                        break;
-                    default:
-                        Console.WriteLine("Помилка: немає такого пункту меню. Спробуйте ще раз.");
-                        Pause();
-                        break;
+                    case "1": ShowAbout(); Pause(); break;
+                    case "2": HandleCostTabulation(); Pause(); break;
+                    case "3": HandleSalesReport(); Pause(); break;
+                    case "0": running = false; Console.WriteLine("Роботу завершено. До побачення!"); break;
+                    default: Console.WriteLine("Помилка: немає такого пункту меню. Спробуйте ще раз."); Pause(); break;
                 }
             }
+        }
+
+        // Головне меню застосунку
+        static void ShowMenu()
+        {
+            PrintHeader("Аптека (Система обліку препаратів)");
+            Console.WriteLine("1 — довідка про систему та сутність");
+            Console.WriteLine("2 — розрахунок вартості замовлення (табулювання)");
+            Console.WriteLine("3 — звіт продажів по відділах (таблиця на два входи)");
+            Console.WriteLine("0 — вихід");
+            Console.Write("Ваш вибір: ");
+        }
+
+        // Універсальний вивід заголовка розділу
+        static void PrintHeader(string title)
+        {
+            Console.WriteLine($"=== {title} ===");
+            Console.WriteLine();
         }
 
         // Пункт 1: Довідка про тему, сутність та поля
         static void ShowAbout()
         {
-            Console.WriteLine("=== Довідка про застосунок ===");
+            PrintHeader("Довідка про застосунок");
             Console.WriteLine("Тема: Аптека");
             Console.WriteLine("Головна сутність: Лікарський препарат");
             Console.WriteLine("Підсумкова величина: Загальна вартість запасів (грн)");
@@ -68,16 +65,26 @@ namespace Pharmacy
             Console.WriteLine("8. Термін придатності  — DateTime");
         }
 
-        // Пункт 2: Табулювання функції (не менше 8 рядків, дробовий крок, 2 стовпці значень)
-        static void ShowCostTable()
+        // Пункт 2: Збір параметрів через ReadDouble та запуск табулювання
+        static void HandleCostTabulation()
         {
-            Console.WriteLine("=== Таблиця вартості закупівлі препарату (зі знижкою 5% від 3 кг) ===");
-            Console.WriteLine("Базова ціна за 1 кг сировини: 240,00 грн.\n");
+            PrintHeader("Налаштування табулювання вартості закупівлі");
 
-            double basePrice = 240.0;
-            double startWeight = 0.5;
-            double endWeight = 5.0;
-            double step = 0.5;
+            double startWeight = ReadDouble("Введіть початкову вагу в кг (0,1 – 50): ", 0.1, 50.0);
+            double endWeight = ReadDouble($"Введіть кінцеву вагу в кг ({startWeight:F1} – 100): ", startWeight, 100.0);
+            double step = ReadDouble("Введіть крок ваги в кг (0,1 – 20): ", 0.1, 20.0);
+
+            Console.WriteLine();
+            PrintCostTable(startWeight, endWeight, step);
+        }
+
+        // Табулювання функції з трьома параметрами (початок, кінець, крок)
+        static void PrintCostTable(double startWeight, double endWeight, double step)
+        {
+            const double basePrice = 240.0;
+
+            PrintHeader("Таблиця вартості закупівлі (знижка 5% від 3 кг)");
+            Console.WriteLine($"Базова ціна за 1 кг сировини: {basePrice:F2} грн.\n");
 
             Console.WriteLine("-----------------------------------------");
             Console.WriteLine($"| {"Вага (кг)",-10} | {"Без знижки",11} | {"Зі знижкою",11} |");
@@ -85,36 +92,41 @@ namespace Pharmacy
 
             for (double w = startWeight; w <= endWeight + 1e-9; w += step)
             {
-                double fullPrice = w * basePrice;
-                double finalPrice = (w >= 3.0) ? fullPrice * 0.95 : fullPrice;
+                double fullPrice = CalculateOrderCost(w, basePrice, false);
+                double discountedPrice = CalculateOrderCost(w, basePrice, true);
 
-                Console.WriteLine($"| {w,-10:F1} | {fullPrice,11:F2} | {finalPrice,11:F2} |");
+                Console.WriteLine($"| {w,-10:F1} | {fullPrice,11:F2} | {discountedPrice,11:F2} |");
             }
 
             Console.WriteLine("-----------------------------------------");
         }
 
-        // Пункт 3: Таблиця на два входи вкладеними циклами (Рівень А + Рівень Б)
-        static void ShowSalesTable()
+        // Чистий розрахунковий метод (Рівень А, п. 3): обчислює вартість замовлення і повертає результат
+        static double CalculateOrderCost(double weightKg, double pricePerKg, bool applyDiscount)
         {
-            Console.WriteLine("=== Звіт відпущених упаковок (Відділи × Дні тижня) ===");
-
-            Console.Write("Введіть кількість відділів (рядків, наприклад 4): ");
-            if (!int.TryParse(Console.ReadLine(), out int rows) || rows <= 0)
+            double total = weightKg * pricePerKg;
+            if (applyDiscount && weightKg >= 3.0)
             {
-                Console.WriteLine("Помилка: кількість рядків має бути додатним цілим числом.");
-                return;
+                return total * 0.95;
             }
+            return total;
+        }
 
-            Console.Write("Введіть кількість днів (стовпців, наприклад 5): ");
-            if (!int.TryParse(Console.ReadLine(), out int cols) || cols <= 0)
-            {
-                Console.WriteLine("Помилка: кількість стовпців має бути додатним цілим числом.");
-                return;
-            }
+        // Пункт 3: Збір розмірів через ReadInt та вивід двовимірної таблиці
+        static void HandleSalesReport()
+        {
+            PrintHeader("Звіт відпущених упаковок (Відділи × Дні тижня)");
+
+            int rows = ReadInt("Введіть кількість відділів (1 – 20): ", 1, 20);
+            int cols = ReadInt("Введіть кількість днів (1 – 14): ", 1, 14);
 
             Console.WriteLine();
+            PrintSalesTable(rows, cols);
+        }
 
+        // Вивід таблиці з двома входами та підсумками по рядках і стовпцях
+        static void PrintSalesTable(int rows, int cols)
+        {
             int[] colTotals = new int[cols];
             int grandTotal = 0;
 
@@ -135,8 +147,7 @@ namespace Pharmacy
 
                 for (int c = 1; c <= cols; c++)
                 {
-                    int soldUnits = (r * 12) + (c * 5);
-
+                    int soldUnits = CalculateDailyUnits(r, c);
                     rowSum += soldUnits;
                     colTotals[c - 1] += soldUnits;
 
@@ -156,7 +167,40 @@ namespace Pharmacy
             Console.WriteLine($"{grandTotal,11}");
         }
 
-        // Пауза та очищення екрана після виконання дії
+        // Чистий розрахунковий метод для комірки звіту
+        static int CalculateDailyUnits(int departmentIndex, int dayIndex)
+        {
+            return (departmentIndex * 12) + (dayIndex * 5);
+        }
+
+        // Рівень Б: Безпечне читання дробового числа в межах [min; max]
+        static double ReadDouble(string prompt, double min, double max)
+        {
+            while (true)
+            {
+                Console.Write(prompt);
+                string input = Console.ReadLine() ?? "";
+
+                if (!double.TryParse(input, out double value))
+                {
+                    Console.WriteLine("Помилка: введено не число. Спробуйте ще раз.");
+                    continue;
+                }
+
+                if (value < min || value > max)
+                {
+                    Console.WriteLine($"Помилка: число має бути в межах від {min} до {max}.");
+                    continue;
+                }
+
+                return value;
+            }
+        }
+
+        // Рівень Б: Безпечне читання цілого числа в межах [min; max]
+       
+
+        // Пауза та очищення екрана
         static void Pause()
         {
             Console.WriteLine("\nНатисніть будь-яку клавішу для повернення в меню...");
