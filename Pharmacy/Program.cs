@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 
 namespace PharmacyApp
 {
@@ -13,6 +15,8 @@ namespace PharmacyApp
         public int Quantity { get; set; }
         public bool RequiresPrescription { get; set; }
         public DateTime ExpiryDate { get; set; }
+
+        public Medicine() { }
 
         public Medicine(int id, string name, decimal price, int quantity, bool requiresPrescription, DateTime expiryDate)
         {
@@ -39,20 +43,59 @@ namespace PharmacyApp
 
     class Pharmacy
     {
+        private readonly string _filePath;
         private List<Medicine> _inventory = new List<Medicine>();
         private int _nextId = 1;
 
-        public Pharmacy()
+        public Pharmacy(string filePath = "pharmacy_data.json")
         {
-            AddMedicine("Парацетамол", 45.50m, 30, false, DateTime.Today.AddMonths(8));
-            AddMedicine("Ібупрофен", 82.00m, 15, false, DateTime.Today.AddMonths(4));
-            AddMedicine("Амоксицилін", 210.00m, 10, true, DateTime.Today.AddDays(-5));
-            AddMedicine("Но-шпа", 135.75m, 20, false, DateTime.Today.AddYears(1));
+            _filePath = filePath;
+            LoadFromFile();
+
+            if (_inventory.Count == 0)
+            {
+                AddMedicine("Парацетамол", 45.50m, 30, false, DateTime.Today.AddMonths(8));
+                AddMedicine("Ібупрофен", 82.00m, 15, false, DateTime.Today.AddMonths(4));
+                AddMedicine("Амоксицилін", 210.00m, 10, true, DateTime.Today.AddDays(-5));
+                AddMedicine("Но-шпа", 135.75m, 20, false, DateTime.Today.AddYears(1));
+                SaveToFile();
+            }
         }
 
         public void AddMedicine(string name, decimal price, int quantity, bool requiresPrescription, DateTime expiryDate)
         {
             _inventory.Add(new Medicine(_nextId++, name, price, quantity, requiresPrescription, expiryDate));
+        }
+
+        public void SaveToFile()
+        {
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(_inventory, options);
+            File.WriteAllText(_filePath, json, Encoding.UTF8);
+            Console.WriteLine($"Дані збережено у файл '{_filePath}'.");
+        }
+
+        public void LoadFromFile()
+        {
+            if (!File.Exists(_filePath))
+            {
+                return;
+            }
+
+            try
+            {
+                string json = File.ReadAllText(_filePath, Encoding.UTF8);
+                var loaded = JsonSerializer.Deserialize<List<Medicine>>(json);
+                if (loaded != null)
+                {
+                    _inventory = loaded;
+                    _nextId = _inventory.Count > 0 ? _inventory.Max(m => m.Id) + 1 : 1;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Помилка читання файлу '{_filePath}': {ex.Message}");
+            }
         }
 
         public void ShowAll()
@@ -146,6 +189,7 @@ namespace PharmacyApp
             med.Quantity -= amount;
             decimal totalCost = med.Price * amount;
             Console.WriteLine($"Продано: {med.Name} ({amount} шт.). До сплати: {totalCost:F2} грн.");
+            SaveToFile();
         }
     }
 
@@ -184,7 +228,6 @@ namespace PharmacyApp
 
             Pharmacy pharmacy = new Pharmacy();
             pharmacy.ShowAll();
-            pharmacy.ShowExpired();
         }
     }
 }
