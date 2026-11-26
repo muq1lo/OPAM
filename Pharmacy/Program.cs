@@ -1,207 +1,209 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
-namespace Pharmacy
+namespace PharmacyApp
 {
-    internal class Program
+    // Модель лікарського засобу
+    class Medicine
     {
-        static void Main(string[] args)
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public decimal Price { get; set; }
+        public int Quantity { get; set; }
+        public bool RequiresPrescription { get; set; }
+
+        public Medicine(int id, string name, decimal price, int quantity, bool requiresPrescription)
         {
-            Console.OutputEncoding = Encoding.UTF8;
-            const int Capacity = 100;
+            Id = id;
+            Name = name;
+            Price = price;
+            Quantity = quantity;
+            RequiresPrescription = requiresPrescription;
+        }
 
-            // Дані живуть у Main і передаються в методи параметрами
-            double[] prices = new double[Capacity];
-            int count = 0;
+        public override string ToString()
+        {
+            string prescriptionText = RequiresPrescription ? "Так" : "Ні";
+            return $"[{Id}] {Name,-18} | Ціна: {Price,7:F2} грн | Залишок: {Quantity,3} шт. | Рецепт: {prescriptionText}";
+        }
+    }
 
-            bool running = true;
-            while (running)
+    // Клас для управління логікою аптеки
+    class Pharmacy
+    {
+        private List<Medicine> _inventory = new List<Medicine>();
+        private int _nextId = 1;
+
+        public Pharmacy()
+        {
+            // Початкове заповнення складу
+            AddMedicine("Парацетамол", 45.50m, 30, false);
+            AddMedicine("Ібупрофен", 82.00m, 15, false);
+            AddMedicine("Амоксицилін", 210.00m, 10, true);
+            AddMedicine("Но-шпа", 135.75m, 20, false);
+        }
+
+        public void AddMedicine(string name, decimal price, int quantity, bool requiresPrescription)
+        {
+            _inventory.Add(new Medicine(_nextId++, name, price, quantity, requiresPrescription));
+        }
+
+        public void ShowAll()
+        {
+            Console.WriteLine("\n--- Асортимент аптеки ---");
+            if (_inventory.Count == 0)
             {
-                ShowMenu();
+                Console.WriteLine("Склад порожній.");
+                return;
+            }
+
+            foreach (var med in _inventory)
+            {
+                Console.WriteLine(med);
+            }
+        }
+
+        public void SearchByName(string query)
+        {
+            var results = _inventory
+                .Where(m => m.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            Console.WriteLine($"\n--- Результати пошуку для \"{query}\" ---");
+            if (results.Count == 0)
+            {
+                Console.WriteLine("Препаратів не знайдено.");
+                return;
+            }
+
+            foreach (var med in results)
+            {
+                Console.WriteLine(med);
+            }
+        }
+
+        public void SellMedicine(int id, int amount)
+        {
+            var med = _inventory.FirstOrDefault(m => m.Id == id);
+            if (med == null)
+            {
+                Console.WriteLine("Помилка: препарат з таким ID не знайдено.");
+                return;
+            }
+
+            if (amount <= 0)
+            {
+                Console.WriteLine("Помилка: кількість має бути більшою за нуль.");
+                return;
+            }
+
+            if (med.Quantity < amount)
+            {
+                Console.WriteLine($"Недостатньо товару на складі. Доступно: {med.Quantity} шт.");
+                return;
+            }
+
+            if (med.RequiresPrescription)
+            {
+                Console.Write("Увага! Препарат рецептурний. Рецепт перевірено? (так/ні): ");
+                string answer = Console.ReadLine()?.Trim().ToLower();
+                if (answer != "так")
+                {
+                    Console.WriteLine("Продаж скасовано: відсутній рецепт.");
+                    return;
+                }
+            }
+
+            med.Quantity -= amount;
+            decimal totalCost = med.Price * amount;
+            Console.WriteLine($"Продано: {med.Name} ({amount} шт.). До сплати: {totalCost:F2} грн.");
+        }
+    }
+
+    class Program
+    {
+        static void Main()
+        {
+            // Налаштування кодування для коректного відображення кирилиці
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.InputEncoding = Encoding.UTF8;
+
+            Pharmacy pharmacy = new Pharmacy();
+            bool isRunning = true;
+
+            while (isRunning)
+            {
+                Console.WriteLine("\n=== МЕНЮ АПТЕКИ ===");
+                Console.WriteLine("1. Показати всі ліки");
+                Console.WriteLine("2. Знайти препарат за назвою");
+                Console.WriteLine("3. Продати препарат");
+                Console.WriteLine("4. Додати новий препарат на склад");
+                Console.WriteLine("0. Вихід");
+                Console.Write("Оберіть дію: ");
+
                 string choice = Console.ReadLine();
-                Console.WriteLine();
 
                 switch (choice)
                 {
                     case "1":
-                        PrintPricesTable(prices, count);
-                        Pause();
+                        pharmacy.ShowAll();
                         break;
+
                     case "2":
-                        double newPrice = ReadDouble("Введіть ціну препарату (грн): ", 0.01, 100000);
-                        AddValue(prices, ref count, newPrice, Capacity);
-                        Pause();
+                        Console.Write("Введіть назву або частину назви: ");
+                        string query = Console.ReadLine() ?? "";
+                        pharmacy.SearchByName(query);
                         break;
+
                     case "3":
-                        int indexToRemove = ReadInt("Введіть порядковий номер для видалення: ", 1, int.MaxValue) - 1;
-                        RemoveAt(prices, ref count, indexToRemove);
-                        Pause();
+                        pharmacy.ShowAll();
+                        Console.Write("\nВведіть ID препарату для продажу: ");
+                        if (int.TryParse(Console.ReadLine(), out int sellId))
+                        {
+                            Console.Write("Введіть кількість упаковок: ");
+                            if (int.TryParse(Console.ReadLine(), out int amount))
+                            {
+                                pharmacy.SellMedicine(sellId, amount);
+                            }
+                            else
+                            {
+                                Console.WriteLine("Некоректна кількість.");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("Некоректний ID.");
+                        }
                         break;
+
                     case "4":
-                        ShowStatistics(prices, count);
-                        Pause();
+                        Console.Write("Назва препарату: ");
+                        string name = Console.ReadLine() ?? "Невідомо";
+
+                        Console.Write("Ціна (грн): ");
+                        decimal.TryParse(Console.ReadLine(), out decimal price);
+
+                        Console.Write("Кількість на складі: ");
+                        int.TryParse(Console.ReadLine(), out int qty);
+
+                        Console.Write("Потрібен рецепт? (так/ні): ");
+                        bool rx = Console.ReadLine()?.Trim().ToLower() == "так";
+
+                        pharmacy.AddMedicine(name, price, qty, rx);
+                        Console.WriteLine("Препарат успішно додано!");
                         break;
-                    case "5":
-                        RunReferenceDemo();
-                        Pause();
-                        break;
+
                     case "0":
-                        running = false;
-                        Console.WriteLine("До побачення.");
+                        isRunning = false;
                         break;
+
                     default:
-                        Console.WriteLine("Немає такого пункту.");
-                        Pause();
+                        Console.WriteLine("Невідома команда. Спробуйте ще раз.");
                         break;
                 }
             }
-        }
-
-        static void ShowMenu()
-        {
-            Console.WriteLine("=== Аптека (ЛР №9: Масив цін) ===");
-            Console.WriteLine("1 — показати таблицю цін");
-            Console.WriteLine("2 — додати ціну препарату");
-            Console.WriteLine("3 — видалити ціну за номером");
-            Console.WriteLine("4 — показати статистику (сума, середнє, максимум)");
-            Console.WriteLine("5 — дослід: значимий тип проти посилального");
-            Console.WriteLine("0 — вихід");
-            Console.Write("Ваш вибір: ");
-        }
-
-        // Рівень А (п. 1): Додавання з використанням ref-лічильника
-        static void AddValue(double[] values, ref int count, double newValue, int capacity)
-        {
-            if (count == capacity)
-            {
-                Console.WriteLine("Сховище заповнене. Місця більше немає.");
-                return;
-            }
-
-            values[count] = newValue;
-            count++;
-            Console.WriteLine($"Ціну {newValue:F2} грн додано. Усього записів: {count}.");
-        }
-
-        // Рівень А (п. 2): Виведення вмісту масиву таблицею до count
-        static void PrintPricesTable(double[] values, int count)
-        {
-            if (count == 0)
-            {
-                Console.WriteLine("Список цін порожній.");
-                return;
-            }
-
-            Console.WriteLine($"{"№",5}{"Ціна (грн)",15}");
-            for (int i = 0; i < count; i++)
-            {
-                Console.WriteLine($"{i + 1,5}{values[i],15:F2}");
-            }
-        }
-
-        // Рівень А (п. 3): Метод із двома out-параметрами (максимум та його індекс)
-        static void FindMax(double[] values, int count, out double maxVal, out int maxIndex)
-        {
-            maxVal = values[0];
-            maxIndex = 0;
-
-            for (int i = 1; i < count; i++)
-            {
-                if (values[i] > maxVal)
-                {
-                    maxVal = values[i];
-                    maxIndex = i;
-                }
-            }
-        }
-
-        static void Statistics(double[] values, int count, out double sum, out double average)
-        {
-            sum = 0;
-            for (int i = 0; i < count; i++)
-            {
-                sum += values[i];
-            }
-            average = count > 0 ? sum / count : 0;
-        }
-
-        static void ShowStatistics(double[] prices, int count)
-        {
-            if (count == 0)
-            {
-                Console.WriteLine("Немає даних для розрахунку статистики.");
-                return;
-            }
-
-            Statistics(prices, count, out double sum, out double avg);
-            FindMax(prices, count, out double maxPrice, out int maxIdx);
-
-            Console.WriteLine($"Кількість позицій: {count}");
-            Console.WriteLine($"Загальна сума:     {sum:F2} грн");
-            Console.WriteLine($"Середня ціна:      {avg:F2} грн");
-            Console.WriteLine($"Найдорожчий товар: {maxPrice:F2} грн (позиція №{maxIdx + 1})");
-        }
-
-        // Рівень Б: Видалення зі зсувом вліво
-        static void RemoveAt(double[] values, ref int count, int index)
-        {
-            if (count == 0 || index < 0 || index >= count)
-            {
-                Console.WriteLine("Помилка: некоректний номер запису.");
-                return;
-            }
-
-            for (int i = index; i < count - 1; i++)
-            {
-                values[i] = values[i + 1];
-            }
-            count--;
-            Console.WriteLine($"Запис №{index + 1} видалено. Залишилось: {count}.");
-        }
-
-        // Рівень А (п. 4): Демонстрація різниці між int (копія) та int[] (посилання)
-        static void RunReferenceDemo()
-        {
-            int singlePrice = 100;
-            int[] arrayPrices = { 100, 200 };
-
-            Console.WriteLine($"До виклику: singlePrice = {singlePrice}, arrayPrices[0] = {arrayPrices[0]}");
-            TryChangeValue(singlePrice);
-            ChangeArrayElement(arrayPrices);
-            Console.WriteLine($"Після виклику: singlePrice = {singlePrice} (не змінився), arrayPrices[0] = {arrayPrices[0]} (змінився)");
-        }
-
-        static void TryChangeValue(int number) => number = 999;
-        static void ChangeArrayElement(int[] arr) => arr[0] = 999;
-
-        // Допоміжні методи введення з ЛР №8
-        static double ReadDouble(string prompt, double min, double max)
-        {
-            while (true)
-            {
-                Console.Write(prompt);
-                if (double.TryParse(Console.ReadLine(), out double val) && val >= min && val <= max)
-                    return val;
-                Console.WriteLine($"Потрібне число від {min} до {max}.");
-            }
-        }
-
-        static int ReadInt(string prompt, int min, int max)
-        {
-            while (true)
-            {
-                Console.Write(prompt);
-                if (int.TryParse(Console.ReadLine(), out int val) && val >= min && val <= max)
-                    return val;
-                Console.WriteLine($"Потрібне ціле число від {min} до {max}.");
-            }
-        }
-
-        static void Pause()
-        {
-            Console.WriteLine("\nНатисніть будь-яку клавішу...");
-            Console.ReadKey(true);
-            Console.Clear();
         }
     }
 }
