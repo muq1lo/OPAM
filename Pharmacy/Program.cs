@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -129,6 +130,32 @@ namespace PharmacyApp
             }
         }
 
+        public void RemoveExpired()
+        {
+            int removedCount = _inventory.RemoveAll(m => m.IsExpired());
+            if (removedCount == 0)
+            {
+                Console.WriteLine("Прострочених позицій для списання не знайдено.");
+                return;
+            }
+
+            Console.WriteLine($"Списано прострочених позицій: {removedCount}.");
+            SaveToFile();
+        }
+
+        public void ShowSummary()
+        {
+            int totalUnits = _inventory.Sum(m => m.Quantity);
+            decimal totalValue = _inventory.Sum(m => m.Price * m.Quantity);
+            int expiredCount = _inventory.Count(m => m.IsExpired());
+
+            Console.WriteLine("\n--- Звіт по складу ---");
+            Console.WriteLine($"Кількість найменувань: {_inventory.Count}");
+            Console.WriteLine($"Загальна кількість упаковок: {totalUnits} шт.");
+            Console.WriteLine($"Загальна вартість запасів: {totalValue:F2} грн.");
+            Console.WriteLine($"Прострочених позицій: {expiredCount}");
+        }
+
         public void SearchByName(string query)
         {
             var results = _inventory
@@ -221,13 +248,98 @@ namespace PharmacyApp
             }
         }
 
+        static DateTime ReadDate(string prompt)
+        {
+            while (true)
+            {
+                Console.Write(prompt);
+                string input = Console.ReadLine()?.Trim();
+                if (DateTime.TryParseExact(input, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date))
+                {
+                    return date;
+                }
+                Console.WriteLine("Некоректна дата. Введіть у форматі РРРР-ММ-ДД (наприклад, 2027-05-15).");
+            }
+        }
+
         static void Main()
         {
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
 
             Pharmacy pharmacy = new Pharmacy();
-            pharmacy.ShowAll();
+            bool isRunning = true;
+
+            while (isRunning)
+            {
+                Console.WriteLine("\n=== МЕНЮ АПТЕКИ (ЛАБ 10) ===");
+                Console.WriteLine("1. Показати всі ліки");
+                Console.WriteLine("2. Знайти препарат за назвою");
+                Console.WriteLine("3. Продати препарат");
+                Console.WriteLine("4. Додати новий препарат на склад");
+                Console.WriteLine("5. Переглянути прострочені ліки");
+                Console.WriteLine("6. Списати прострочені ліки");
+                Console.WriteLine("7. Звіт по складу");
+                Console.WriteLine("0. Вихід");
+                Console.Write("Оберіть дію: ");
+
+                string choice = Console.ReadLine();
+
+                switch (choice)
+                {
+                    case "1":
+                        pharmacy.ShowAll();
+                        break;
+
+                    case "2":
+                        Console.Write("Введіть назву або частину назви: ");
+                        string query = Console.ReadLine() ?? "";
+                        pharmacy.SearchByName(query);
+                        break;
+
+                    case "3":
+                        pharmacy.ShowAll();
+                        int sellId = ReadInt("\nВведіть ID препарату для продажу: ");
+                        int amount = ReadInt("Введіть кількість упаковок: ");
+                        pharmacy.SellMedicine(sellId, amount);
+                        break;
+
+                    case "4":
+                        Console.Write("Назва препарату: ");
+                        string name = Console.ReadLine() ?? "Невідомо";
+                        decimal price = ReadDecimal("Ціна (грн): ");
+                        int qty = ReadInt("Кількість на складі: ");
+                        DateTime expiry = ReadDate("Придатний до (РРРР-ММ-ДД): ");
+
+                        Console.Write("Потрібен рецепт? (так/ні): ");
+                        bool rx = Console.ReadLine()?.Trim().ToLower() == "так";
+
+                        pharmacy.AddMedicine(name, price, qty, rx, expiry);
+                        pharmacy.SaveToFile();
+                        Console.WriteLine("Препарат успішно додано!");
+                        break;
+
+                    case "5":
+                        pharmacy.ShowExpired();
+                        break;
+
+                    case "6":
+                        pharmacy.RemoveExpired();
+                        break;
+
+                    case "7":
+                        pharmacy.ShowSummary();
+                        break;
+
+                    case "0":
+                        isRunning = false;
+                        break;
+
+                    default:
+                        Console.WriteLine("Невідома команда. Спробуйте ще раз.");
+                        break;
+                }
+            }
         }
     }
 }
